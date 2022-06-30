@@ -1,0 +1,31 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+machines = {
+	server0: { ip: "192.168.56.100" },
+	node0: { ip: "192.168.56.200" },
+	node1: { ip: "192.168.56.201" },
+}
+
+Vagrant.configure("2") do |config|
+	machines.each_with_index do |(hostname, attrs), index|
+		config.vm.define hostname do |node|
+			node.vm.box = "ubuntu/focal64"
+			node.vm.network "private_network", ip: attrs[:ip]
+			node.vm.provider "virtualbox" do |vbox|
+				vbox.memory = 512
+			end
+
+			if index == machines.size - 1
+				config.vm.provision "ansible" do |ansible|
+					ansible.limit = "all"
+					ansible.playbook = "ansible/site.yml"
+					ansible.groups = {
+						servers: ["server0"],
+						nodes: ["node0", "node1"],
+					}
+				end
+			end
+		end
+	end
+end

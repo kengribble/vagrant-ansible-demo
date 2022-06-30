@@ -1,0 +1,79 @@
+- hosts: all
+  become: true
+  become_user: root
+  gather_facts: true
+  tasks:
+
+    - name: Add mappings to /etc/hosts
+      blockinfile:
+        path: /etc/hosts
+        block: |
+          {{ item.ip }} {{ item.name }}
+        marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item.name }}"
+      loop:
+        - { name: server0, ip: 192.168.56.100 }
+        - { name: node0, ip: 192.168.56.200 }
+        - { name: node1, ip: 192.168.56.201 }
+
+    - name: Update apt repo and cache on all Debian/Ubuntu boxes
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+
+    - name: Upgrade all packages on servers
+      apt: upgrade=dist force_apt_get=yes
+
+    - name: Install needed packages
+      apt:
+        pkg:
+          - lnav
+          - git
+          - tree
+          - htop
+        state: latest
+        update_cache: true
+
+    - name: Check if a reboot is needed on all servers
+      register: reboot_required_file
+      stat: path=/var/run/reboot-required get_md5=no
+
+    - name: Reboot the box if kernel updated
+      reboot:
+        msg: "Reboot initiated by Ansible for kernel updates"
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: uptime
+      when: reboot_required_file.stat.exists
+
+- hosts: servers
+  become: true
+  become_user: root
+  gather_facts: true
+  tasks:
+
+    - name: Update apt repo and cache on all Debian/Ubuntu boxes
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+
+    - name: Install needed packages
+      apt:
+        pkg:
+          - apache2
+          - apache2-ssl-dev
+        state: latest
+        update_cache: true
+
+- hosts: nodes
+  become: true
+  become_user: root
+  gather_facts: true
+  tasks:
+
+    - name: Update apt repo and cache on all Debian/Ubuntu boxes
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+
+    - name: Install needed packages
+      apt:
+        pkg:
+          - nmap
+        state: latest
+        update_cache: true
